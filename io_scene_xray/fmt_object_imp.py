@@ -17,13 +17,41 @@ class ImportContext:
         self.bpy = bpy
         self.textures_folder = textures
         self.op = op
-        self.__images = {}
 
-    def image(self, relpath):
-        relpath = relpath.lower().replace('\\', os.path.sep)
-        result = self.__images.get(relpath)
-        if result is None:
-            self.__images[relpath] = result = self.bpy.data.images.load(os.path.join(self.textures_folder, '{}.dds'.format(relpath)))
+    class ResolvedTexture:
+        def __init__(self, texture_name, absolute_texture_filepath):
+            self.name = texture_name
+            self.filepath = absolute_texture_filepath
+
+    def resolve_texture(self, texture_name):
+        path = os.path.join(self.textures_folder, texture_name.replace('\\', os.path.sep) + '.dds')
+        if os.path.exists(path):
+            return self.ResolvedTexture(texture_name, os.path.abspath(path))
+        raise BaseException('cannot find texture "{}"'.format(path))
+
+    @staticmethod
+    def find_compatible_texture(resolved_texture, textures):
+        for t in textures:
+            if t.name == resolved_texture.name:
+                return t
+        for t in textures:
+            if hasattr(t, 'image') and bpy.path.abspath(t.image.filepath) == resolved_texture.filepath:
+                return t
+        return None
+
+    @staticmethod
+    def _image(resolved_filepath):
+        for i in bpy.data.images:
+            if bpy.path.abspath(i.filepath) == resolved_filepath:
+                return i
+        return bpy.data.images.load(resolved_filepath)
+
+    def texture(self, resolved_texture):
+        extsts = self.find_compatible_texture(resolved_texture, bpy.data.textures)
+        if extsts:
+            return extsts
+        result = bpy.data.textures.new(resolved_texture.name, type='IMAGE')
+        result.image = self._image(resolved_texture.filepath)
         return result
 
 
@@ -304,15 +332,13 @@ def _import_main(fpath, cx, cr):
                     bpy_material.xray.cshader = cshader
                     bpy_material.xray.gamemtl = gamemtl
                     if texture:
-                        bpy_texture = cx.bpy.data.textures.get(texture)
-                        if bpy_texture is None:
-                            bpy_texture = cx.bpy.data.textures.new(texture, type='IMAGE')
-                            bpy_texture.image = cx.image(texture)
-                        bpy_texture_slot = bpy_material.texture_slots.add()
-                        bpy_texture_slot.texture = bpy_texture
-                        bpy_texture_slot.texture_coords = 'UV'
-                        bpy_texture_slot.uv_layer = vmap
-                        bpy_texture_slot.use_map_color_diffuse = True
+                        resolved_texture = cx.resolve_texture(texture)
+                        if not ImportContext.find_compatible_texture(resolved_texture, [ts.texture for ts in bpy_material.texture_slots if ts]):
+                            bpy_texture_slot = bpy_material.texture_slots.add()
+                            bpy_texture_slot.texture = cx.texture(resolved_texture)
+                            bpy_texture_slot.texture_coords = 'UV'
+                            bpy_texture_slot.uv_layer = vmap
+                            bpy_texture_slot.use_map_color_diffuse = True
         elif cid == Chunks.Object.BONES1:
             if cx.bpy and (bpy_armature is None):
                 bpy_armature = cx.bpy.data.armatures.new(object_name)
