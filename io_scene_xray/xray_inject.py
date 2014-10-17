@@ -99,10 +99,17 @@ class XRayMeshProperties(bpy.types.PropertyGroup):
 
 
 class XRayMaterialProperties(bpy.types.PropertyGroup):
+    def __getattribute__(self, item):  # lazy initialization hack
+        eshader = bpy.types.PropertyGroup.__getattribute__(self, 'eshader')
+        if eshader == '':
+            print('init eshader')
+            o = bpy.context.active_object
+            self.eshader = r = 'models\\model' if o and hasattr(o, 'xray') and o.xray.isroot and (o.xray.flags & 0x1) else 'default'
+        return bpy.types.PropertyGroup.__getattribute__(self, item)
     b_type = bpy.types.Material
     flags = bpy.props.IntProperty(name='flags')
     flags_twosided = gen_flag_prop(mask=0x01)
-    eshader = bpy.props.StringProperty(name='eshader', default='models\\model')
+    eshader = bpy.props.StringProperty(name='eshader')
     cshader = bpy.props.StringProperty(name='cshader', default='default')
     gamemtl = bpy.props.StringProperty(name='gamemtl', default='default')
 
