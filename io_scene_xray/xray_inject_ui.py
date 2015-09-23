@@ -141,12 +141,29 @@ class XRayBonePanel(XRayPanel):
         box.prop(data.mass, 'center')
 
 
+class XRayImagePanel(XRayPanel):
+    bl_context = 'texture'
+
+    def draw(self, context):
+        layout = self.layout
+        layout.label('wqe')
+        xr = context.active_object.active_material.active_texture.xray
+        layout.prop(xr, 'folder')
+        layout.prop(xr, 'file')
+        txs = bpy.data.textures
+        if txs.find('_preview') == -1:
+            txs.new('_preview', 'IMAGE')
+        tx = txs['_preview']
+        layout.template_preview(tx)
+
+
 classes = [
     XRayObjectPanel
     , XRayMeshPanel
     , XRayMaterialPanel
     , XRayArmaturePanel
     , XRayBonePanel
+    , XRayImagePanel
 ]
 
 

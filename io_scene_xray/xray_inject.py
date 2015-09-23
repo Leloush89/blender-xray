@@ -223,12 +223,55 @@ class XRayBoneProperties(bpy.types.PropertyGroup):
             bgl.glLineWidth(prev_line_width[0])
 
 
+class XRayImageProperties(bpy.types.PropertyGroup):
+    b_type = bpy.types.ImageTexture
+
+    def get_files(self, context):
+        import os
+        addon_prefs = bpy.context.user_preferences.addons['io_scene_xray'].preferences
+        prefix = addon_prefs.gamedata_folder + '/textures/' + self.folder + '/'
+        prefix_length = len(prefix)
+        result = []
+        for f in os.listdir(prefix):
+            if not f.endswith('.dds'):
+                continue
+            result.append((prefix + f, f, ''))
+        result.sort()
+        return result
+
+    def update_file(self, context):
+        img = bpy.data.images.load(self.file)
+        bpy.data.textures['_preview'].image = img
+
+    file = bpy.props.EnumProperty(items=get_files, options={'SKIP_SAVE'}, update=update_file)
+
+    folders = []
+
+    def get_folders(self, context):
+        if len(self.folders) == 0:
+            import os
+            addon_prefs = bpy.context.user_preferences.addons['io_scene_xray'].preferences
+            prefix = addon_prefs.gamedata_folder + '/textures/'
+            prefix_length = len(prefix)
+            for dn, dns, fns in os.walk(prefix):
+                dds = [i for i in fns if i.endswith('.dds')]
+                if len(dds) == 0:
+                    continue
+                n = dn[prefix_length:]
+                self.folders.append((n, n, ''))
+            self.folders.sort()
+        return self.folders
+
+    folder = bpy.props.EnumProperty(items=get_folders, options={'SKIP_SAVE'})
+
+
 classes = [
     XRayObjectProperties
     , XRayMeshProperties
     , XRayMaterialProperties
     , XRayArmatureProperties
     , XRayBoneProperties
+    , XRayImageProperties
 ]
 
 
