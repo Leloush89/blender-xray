@@ -4,11 +4,12 @@ import math
 import mathutils
 import os.path
 from .xray_io import ChunkedReader, PackedReader
+from .xray_io import ChunkedWriter, PackedWriter
 
 
-class ImportContext:
-    def __init__(self, camera_animation):
-        self.camera_animation = camera_animation
+class Context:
+    def __init__(self, as_camera_animation):
+        self.as_camera_animation = as_camera_animation
 
 
 def _import(fpath, cr, cx):
@@ -25,7 +26,7 @@ def _import(fpath, cr, cx):
                 name = os.path.basename(fpath)
             bpy_obj = bpy.data.objects.new(name, None)
             bpy_obj.rotation_mode = 'ZXY'
-            if cx.camera_animation:
+            if cx.as_camera_animation:
                 bpy_cam = bpy.data.objects.new(name, bpy.data.cameras.new(name))
                 bpy_cam.parent = bpy_obj
                 bpy_cam.rotation_euler = (math.pi / 2, 0, 0)
@@ -107,3 +108,35 @@ def _import(fpath, cr, cx):
 def import_file(fpath, cx):
     with io.open(fpath, 'rb') as f:
         _import(fpath, ChunkedReader(f.read()), cx)
+
+
+def _export(bpy_obj, cw, cx):
+    pw = PackedWriter()
+    pw.puts('')
+    bpy_act = bpy_obj.animation_data.action
+    fr = bpy_act.frame_range
+    pw.putf('II', int(fr[0]), int(fr[1]))
+    fps = 30
+    pw.putf('fH', fps, 5)
+
+    for i in range(6):
+        fc = bpy_act.fcurves[(0, 2, 1, 5, 3, 4)[i]]
+        kv = (1, 1, 1, -1, 1, 1)[i]
+        pw.putf('BB', 1, 1)
+        fckf = fc.keyframe_points
+        pw.putf('H', len(fckf))
+        print(i)
+        for p in fckf:
+            pw.putf('ffB', p.co.y / kv, p.co.x / fps, 5)
+            pw.putf('HHH', 32768, 32768, 32768)
+            dl, dr = p.handle_left - p.co, p.handle_right - p.co
+            print(dl, dr)
+            pw.putf('HHHH', *tuple(((int(max(min(x, 32), -32)) + 32) * 65536 // 64) for x in [dl.x/fps, dl.y, dr.x/fps, dr.y]))
+    cw.put(0x1100, pw)
+
+
+def export_file(bpy_obj, fpath, cx):
+    with io.open(fpath, 'wb') as f:
+        cw = ChunkedWriter()
+        _export(bpy_obj, cw, cx)
+        f.write(cw.data)
