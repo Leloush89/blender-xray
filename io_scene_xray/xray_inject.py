@@ -13,14 +13,12 @@ class XRayObjectRevisionProperties(bpy.types.PropertyGroup):
     mtime = bpy.props.IntProperty(name='mtime')
 
 
-def gen_flag_prop(mask, description='', customprop=''):
+def gen_flag_prop(mask, description=''):
     def getter(self):
         return self.flags & mask
 
     def setter(self, value):
         self.flags = self.flags | mask if value else self.flags & ~mask
-        if customprop and hasattr(self, customprop):
-            setattr(self, customprop, True)
 
     return bpy.props.BoolProperty(description=description, get=getter, set=setter, options={'SKIP_SAVE'})
 
@@ -55,50 +53,35 @@ class XRayObjectProperties(bpy.types.PropertyGroup):
     flags = bpy.props.IntProperty(name='flags')
 
     _flags_simple_inv_map = [
-        None,  # other
-        0x20,  # sound occluder
-        0x14,  # multi. usage
-        0x08,  # hom
-        0x03,  # dynamic progressive
+        0x00,  # static
         0x01,  # dynamic
-        0x00   # static
+        0x03,  # preset: dynamic progressive
+        0x08,  # preset: hom
+        0x14,  # preset: multi. usage
+        0x20   # preset: sound occluder
     ]
-    _flags_simple_map = {v: k for k, v in enumerate(_flags_simple_inv_map)}
-    flags_force_custom = bpy.props.BoolProperty(options={'SKIP_SAVE'})
-    flags_use_custom = bpy.props.BoolProperty(options={'SKIP_SAVE'}, get=lambda self:self.flags_force_custom or not (self.flags in self._flags_simple_map))
-
-    def set_custom_type(self, value):
-        self.flags = self.flags | 0x1 if value else self.flags & ~0x1
-        self.flags_force_custom = True
-
-    flags_custom_type = bpy.props.EnumProperty(name='Custom Object Type', items=(
-        ('st', 'Static', ''),
-        ('dy', 'Dynamic', '')), options={'SKIP_SAVE'}, get=lambda self: self.flags & 0x1, set=set_custom_type)
-    flags_custom_progressive = gen_flag_prop(mask=0x02, description='Make Progressive', customprop='flags_force_custom')
-    flags_custom_lod = gen_flag_prop(mask=0x04, description='Using LOD', customprop='flags_force_custom')
-    flags_custom_hom = gen_flag_prop(mask=0x08, description='Hierarchical Occlusion Mapping', customprop='flags_force_custom')
-    flags_custom_musage = gen_flag_prop(mask=0x10, customprop='flags_force_custom')
-    flags_custom_soccl = gen_flag_prop(mask=0x20, customprop='flags_force_custom')
-    flags_custom_hqexp = gen_flag_prop(mask=0x40, description='HQ Geometry', customprop='flags_force_custom')
-
-    def flags_simple_get(self):
-        if self.flags_force_custom:
-            return 0
-        return self._flags_simple_map.get(self.flags, 0)
 
     def flags_simple_set(self, value):
-        self.flags_force_custom = value == 0
-        if value != 0:  # !custom
+        if value < 2:
+            self.flags = self.flags & ~0x1 or self._flags_simple_inv_map[value]
+        else:
             self.flags = self._flags_simple_inv_map[value]
 
     flags_simple = bpy.props.EnumProperty(name='Object Type', items=(
-        ('??', 'Custom', ''),
-        ('so', 'Sound Occluder', ''),
-        ('mu', 'Multiple Usage', ''),
-        ('ho', 'HOM', 'Hierarchical Occlusion Mapping'),
-        ('pd', 'Progressive Dynamic', ''),
+        ('st', 'Static', ''),
         ('dy', 'Dynamic', ''),
-        ('st', 'Static', '')), options={'SKIP_SAVE'}, get=flags_simple_get, set=flags_simple_set)
+        ('pd', 'Preset: Progressive Dynamic', ''),
+        ('ho', 'Preset: HOM', 'Hierarchical Occlusion Mapping'),
+        ('mu', 'Preset: Multiple Usage', ''),
+        ('so', 'Preset: Sound Occluder', '')
+    ), options={'SKIP_SAVE'}, get=lambda self: self.flags & 0x1, set=flags_simple_set)
+    flags_custom_progressive = gen_flag_prop(mask=0x02, description='Make Progressive')
+    flags_custom_lod = gen_flag_prop(mask=0x04, description='Using LOD')
+    flags_custom_hom = gen_flag_prop(mask=0x08, description='Hierarchical Occlusion Mapping')
+    flags_custom_musage = gen_flag_prop(mask=0x10)
+    flags_custom_soccl = gen_flag_prop(mask=0x20)
+    flags_custom_hqexp = gen_flag_prop(mask=0x40, description='HQ Geometry')
+
     lodref = bpy.props.StringProperty(name='lodref')
     userdata = bpy.props.StringProperty(name='userdata')
     bpy.utils.register_class(XRayObjectRevisionProperties)
