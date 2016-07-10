@@ -93,9 +93,14 @@ class Chunked(Def):
         for cid, cdata in ChunkedReader(pr.getb(pr.remaining())):
             s = self._schema.get(cid, self)
             if s is self:
-                snk.warn('unknown chunk: {:#x}'.format(cid))
+                s = self._schema.get(None, self)
+            if s is self:
+                snk.warn('{} has unknown chunk {:#x}: {}'.format(name, cid, cdata[:256]))
                 continue
-            s[1].read_raw(s[0], snk, cdata)
+            n = s[0]
+            if n is None:
+                n = str(cid)
+            s[1].read_raw(n, snk, cdata)
 
 
 # noinspection PyPep8Naming
