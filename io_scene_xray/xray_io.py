@@ -31,6 +31,9 @@ class PackedReader:
     def skip(self, count):
         self.__offs += count
 
+    def remaining(self):
+        return len(self.__data) - self.__offs
+
 
 class ChunkedReader:
     __MASK_COMPRESSED = 0x80000000
